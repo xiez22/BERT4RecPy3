@@ -19,7 +19,8 @@ import time
 
 
 random_seed = 12345
-short_seq_prob = 0  # Probability of creating sequences which are shorter than the maximum length。
+# Probability of creating sequences which are shorter than the maximum length。
+short_seq_prob = 0
 
 flags = tf.flags
 FLAGS = flags.FLAGS
@@ -51,7 +52,7 @@ flags.DEFINE_integer(
     "Number of times to duplicate the input data (with different masks).")
 
 flags.DEFINE_float("prop_sliding_window", 0.1, "sliding window step size.")
-    
+
 flags.DEFINE_string(
     "data_dir", './data/',
     "data dir.")
@@ -159,9 +160,11 @@ def write_instance_to_example_files(instances, max_seq_length,
         masked_lm_ids = vocab.convert_tokens_to_ids(instance.masked_lm_labels)
         masked_lm_weights = [1.0] * len(masked_lm_ids)
 
-        masked_lm_positions += [0] * (max_predictions_per_seq - len(masked_lm_positions))
+        masked_lm_positions += [0] * \
+            (max_predictions_per_seq - len(masked_lm_positions))
         masked_lm_ids += [0] * (max_predictions_per_seq - len(masked_lm_ids))
-        masked_lm_weights += [0.0] * (max_predictions_per_seq - len(masked_lm_weights))
+        masked_lm_weights += [0.0] * \
+            (max_predictions_per_seq - len(masked_lm_weights))
 
         features = collections.OrderedDict()
         features["info"] = create_int_feature(instance.info)
@@ -247,13 +250,15 @@ def create_training_instances(all_documents_raw,
                 print("got empty seq:" + user)
                 continue
 
-            #todo: add slide
+            # todo: add slide
             if len(item_seq) <= max_num_tokens:
                 all_documents[user] = [item_seq]
             else:
-                beg_idx = range(len(item_seq)-max_num_tokens, 0, -sliding_step)
+                beg_idx = list(
+                    range(len(item_seq)-max_num_tokens, 0, -sliding_step))
                 beg_idx.append(0)
-                all_documents[user] = [item_seq[i:i + max_num_tokens] for i in beg_idx[::-1]]
+                all_documents[user] = [item_seq[i:i + max_num_tokens]
+                                       for i in beg_idx[::-1]]
 
     instances = []
     if force_last:
@@ -269,25 +274,28 @@ def create_training_instances(all_documents_raw,
         print("document num: {}".format(len(all_documents)))
 
         def log_result(result):
-            print("callback function result type: {}, size: {} ".format(type(result), len(result)))
+            print("callback function result type: {}, size: {} ".format(
+                type(result), len(result)))
             instances.extend(result)
 
         for step in range(dupe_factor):
             pool.apply_async(
                 create_instances_threading, args=(
                     all_documents, user, max_seq_length, short_seq_prob,
-                    masked_lm_prob, max_predictions_per_seq, vocab, random.Random(random.randint(1,10000)),
+                    masked_lm_prob, max_predictions_per_seq, vocab, random.Random(
+                        random.randint(1, 10000)),
                     mask_prob, step), callback=log_result)
         pool.close()
         pool.join()
-        
+
         for user in all_documents:
             instances.extend(
                 mask_last(
                     all_documents, user, max_seq_length, short_seq_prob,
                     masked_lm_prob, max_predictions_per_seq, vocab, rng))
 
-        print("num of instance:{}; time:{}".format(len(instances), time.clock() - start_time))
+        print("num of instance:{}; time:{}".format(
+            len(instances), time.clock() - start_time))
     rng.shuffle(instances)
     return instances
 
@@ -295,19 +303,20 @@ def create_training_instances(all_documents_raw,
 def create_instances_threading(all_documents, user, max_seq_length, short_seq_prob,
                                masked_lm_prob, max_predictions_per_seq, vocab, rng,
                                mask_prob, step):
-    cnt = 0;
+    cnt = 0
     start_time = time.clock()
     instances = []
     for user in all_documents:
-        cnt += 1;
+        cnt += 1
         if cnt % 1000 == 0:
-            print("step: {}, name: {}, step: {}, time: {}".format(step, multiprocessing.current_process().name, cnt, time.clock()-start_time))
+            print("step: {}, name: {}, step: {}, time: {}".format(
+                step, multiprocessing.current_process().name, cnt, time.clock()-start_time))
             start_time = time.clock()
         instances.extend(create_instances_from_document_train(
             all_documents, user, max_seq_length, short_seq_prob,
             masked_lm_prob, max_predictions_per_seq, vocab, rng,
             mask_prob))
-        
+
     return instances
 
 
@@ -317,14 +326,14 @@ def mask_last(
     """Creates `TrainingInstance`s for a single document."""
     document = all_documents[user]
     max_num_tokens = max_seq_length
-    
+
     instances = []
     info = [int(user.split("_")[1])]
     vocab_items = vocab.get_items()
 
     for tokens in document:
         assert len(tokens) >= 1 and len(tokens) <= max_num_tokens
-        
+
         (tokens, masked_lm_positions,
          masked_lm_labels) = create_masked_lm_predictions_force_last(tokens)
         instance = TrainingInstance(
@@ -341,9 +350,9 @@ def create_instances_from_document_test(all_documents, user, max_seq_length):
     """Creates `TrainingInstance`s for a single document."""
     document = all_documents[user]
     max_num_tokens = max_seq_length
-    
+
     assert len(document) == 1 and len(document[0]) <= max_num_tokens
-    
+
     tokens = document[0]
     assert len(tokens) >= 1
 
@@ -374,7 +383,7 @@ def create_instances_from_document_train(
 
     for tokens in document:
         assert len(tokens) >= 1 and len(tokens) <= max_num_tokens
-        
+
         (tokens, masked_lm_positions,
          masked_lm_labels) = create_masked_lm_predictions(
              tokens, masked_lm_prob, max_predictions_per_seq,
@@ -451,7 +460,7 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
             # 10% of the time, replace with random word
             else:
                 # masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
-                masked_token = rng.choice(vocab_words)  
+                masked_token = rng.choice(vocab_words)
 
         output_tokens[index] = masked_token
 
@@ -497,7 +506,7 @@ def gen_samples(data,
 
 def main():
     tf.logging.set_verbosity(tf.logging.DEBUG)
-    
+
     max_seq_length = FLAGS.max_seq_length
     max_predictions_per_seq = FLAGS.max_predictions_per_seq
     masked_lm_prob = FLAGS.masked_lm_prob
@@ -509,7 +518,7 @@ def main():
     output_dir = FLAGS.data_dir
     dataset_name = FLAGS.dataset_name
     version_id = FLAGS.signature
-    print version_id
+    print(version_id)
 
     if not os.path.isdir(output_dir):
         print(output_dir + ' is not exist')
@@ -530,9 +539,9 @@ def main():
     print('max:{}, min:{}'.format(max_len, min_len))
 
     print('len_train:{}, len_valid:{}, len_test:{}, usernum:{}, itemnum:{}'.
-        format(
-        len(user_train),
-        len(user_valid), len(user_test), usernum, itemnum))
+          format(
+              len(user_train),
+              len(user_valid), len(user_test), usernum, itemnum))
 
     for idx, u in enumerate(user_train):
         if idx < 10:
