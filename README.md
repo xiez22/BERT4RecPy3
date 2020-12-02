@@ -1,5 +1,5 @@
 # BERT4Rec
-
+This is the Python3 version of https://github.com/FeiSun/BERT4Rec.git.
 
 ## Usage
 
